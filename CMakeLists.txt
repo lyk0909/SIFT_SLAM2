@@ -54,6 +54,7 @@ src/Tracking.cc
 src/LocalMapping.cc
 src/LoopClosing.cc
 src/ORBextractor.cc
+src/SIFTExtractor.cc
 src/ORBmatcher.cc
 src/FrameDrawer.cc
 src/Converter.cc

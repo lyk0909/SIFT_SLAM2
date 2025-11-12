@@ -33,7 +33,7 @@
 #include"Frame.h"
 #include "ORBVocabulary.h"
 #include"KeyFrameDatabase.h"
-#include"ORBextractor.h"
+#include"SIFTExtractor.h"
 #include "Initializer.h"
 #include "MapDrawer.h"
 #include "System.h"
@@ -154,9 +154,9 @@ protected:
     LocalMapping* mpLocalMapper;
     LoopClosing* mpLoopClosing;
 
-    //ORB
-    ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
-    ORBextractor* mpIniORBextractor;
+    //SIFT
+    SIFTExtractor* mpSIFTextractorLeft, *mpSIFTextractorRight;
+    SIFTExtractor* mpIniSIFTextractor;
 
     //BoW
     ORBVocabulary* mpORBVocabulary;

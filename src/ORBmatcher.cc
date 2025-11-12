@@ -21,6 +21,7 @@
 #include "ORBmatcher.h"
 
 #include<limits.h>
+#include<cmath>
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
@@ -34,8 +35,9 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
-const int ORBmatcher::TH_HIGH = 100;
-const int ORBmatcher::TH_LOW = 50;
+// Thresholds adjusted for SIFT (Euclidean distance, not Hamming)
+const int ORBmatcher::TH_HIGH = 300;  // Increased for SIFT
+const int ORBmatcher::TH_LOW = 150;   // Increased for SIFT
 const int ORBmatcher::HISTO_LENGTH = 30;
 
 ORBmatcher::ORBmatcher(float nnratio, bool checkOri): mfNNratio(nnratio), mbCheckOrientation(checkOri)
@@ -1642,24 +1644,42 @@ void ORBmatcher::ComputeThreeMaxima(vector<int>* histo, const int L, int &ind1, 
 }
 
 
-// Bit set count operation from
-// http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel
+// Modified for SIFT: Use L2 (Euclidean) distance instead of Hamming distance
 int ORBmatcher::DescriptorDistance(const cv::Mat &a, const cv::Mat &b)
 {
-    const int *pa = a.ptr<int32_t>();
-    const int *pb = b.ptr<int32_t>();
-
-    int dist=0;
-
-    for(int i=0; i<8; i++, pa++, pb++)
+    // SIFT descriptors are CV_32F with 128 dimensions
+    if(a.type() == CV_32F && b.type() == CV_32F)
     {
-        unsigned  int v = *pa ^ *pb;
-        v = v - ((v >> 1) & 0x55555555);
-        v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
-        dist += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
-    }
+        const float *pa = a.ptr<float>();
+        const float *pb = b.ptr<float>();
 
-    return dist;
+        float dist = 0;
+
+        for(int i = 0; i < a.cols; i++)
+        {
+            float diff = pa[i] - pb[i];
+            dist += diff * diff;
+        }
+
+        return static_cast<int>(sqrt(dist));
+    }
+    else  // Fallback to Hamming distance for ORB descriptors
+    {
+        const int *pa = a.ptr<int32_t>();
+        const int *pb = b.ptr<int32_t>();
+
+        int dist=0;
+
+        for(int i=0; i<8; i++, pa++, pb++)
+        {
+            unsigned  int v = *pa ^ *pb;
+            v = v - ((v >> 1) & 0x55555555);
+            v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+            dist += (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
+        }
+
+        return dist;
+    }
 }
 
 } //namespace ORB_SLAM
