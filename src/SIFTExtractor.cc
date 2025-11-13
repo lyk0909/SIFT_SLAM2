@@ -72,8 +72,15 @@ SIFTExtractor::SIFTExtractor(int _nfeatures, float _scaleFactor, int _nlevels,
     }
     mnFeaturesPerLevel[nlevels-1] = std::max(nfeatures - sumFeatures, 0);
 
-    // Create SIFT detector with nfeatures
-    sift = cv::SIFT::create(nfeatures);
+    // Create SIFT detector with adjusted parameters
+    // 使用平衡的参数:不要太激进
+    sift = cv::SIFT::create(
+        nfeatures * 2,      // 适度增加检测数量
+        nlevels,            // octave 层数
+        0.03,               // contrastThreshold - 平衡质量和数量 (默认 0.04)
+        8,                  // edgeThreshold - 适中的边缘阈值 (默认 10)
+        1.6                 // sigma
+    );
 }
 
 void SIFTExtractor::operator()(InputArray _image, InputArray _mask,
@@ -127,35 +134,59 @@ void SIFTExtractor::operator()(InputArray _image, InputArray _mask,
     }
 
     // Merge all keypoints and descriptors
-    int nkeypoints = 0;
+    std::vector<KeyPoint> allKeypointsMerged;
+    Mat allDescriptorsMerged;
+    
     for (int level = 0; level < nlevels; ++level)
-        nkeypoints += allKeypoints[level].size();
-
-    _keypoints.clear();
-    _keypoints.reserve(nkeypoints);
-
-    Mat allDescriptors;
-    if(nkeypoints > 0)
     {
-        allDescriptors = Mat(nkeypoints, 128, CV_32F);
-        
-        int offset = 0;
-        for (int level = 0; level < nlevels; ++level)
+        allKeypointsMerged.insert(allKeypointsMerged.end(), 
+                                 allKeypoints[level].begin(), 
+                                 allKeypoints[level].end());
+        if(!descriptors[level].empty())
         {
-            std::vector<KeyPoint> &keypoints = allKeypoints[level];
-            Mat &desc = descriptors[level];
-
-            for(size_t j = 0; j < keypoints.size(); j++)
-            {
-                _keypoints.push_back(keypoints[j]);
-                desc.row(j).copyTo(allDescriptors.row(offset));
-                offset++;
-            }
+            allDescriptorsMerged.push_back(descriptors[level]);
         }
     }
 
-    _descriptors.create(allDescriptors.rows, allDescriptors.cols, allDescriptors.type());
-    allDescriptors.copyTo(_descriptors);
+    if(allKeypointsMerged.empty())
+    {
+        _keypoints.clear();
+        _descriptors.release();
+        return;
+    }
+
+    // Simple: sort by response and keep best nfeatures
+    if(allKeypointsMerged.size() > (size_t)nfeatures)
+    {
+        std::vector<std::pair<float, int>> keypointsWithResponse;
+        for(size_t i = 0; i < allKeypointsMerged.size(); i++)
+        {
+            keypointsWithResponse.push_back(std::make_pair(allKeypointsMerged[i].response, i));
+        }
+        
+        std::sort(keypointsWithResponse.begin(), keypointsWithResponse.end(),
+                 [](const std::pair<float,int>& a, const std::pair<float,int>& b) {
+                     return a.first > b.first;
+                 });
+        
+        std::vector<KeyPoint> selectedKeypoints;
+        Mat selectedDescriptors;
+        
+        for(int i = 0; i < nfeatures && i < (int)keypointsWithResponse.size(); i++)
+        {
+            int idx = keypointsWithResponse[i].second;
+            selectedKeypoints.push_back(allKeypointsMerged[idx]);
+            selectedDescriptors.push_back(allDescriptorsMerged.row(idx));
+        }
+        
+        _keypoints = selectedKeypoints;
+        selectedDescriptors.copyTo(_descriptors);
+    }
+    else
+    {
+        _keypoints = allKeypointsMerged;
+        allDescriptorsMerged.copyTo(_descriptors);
+    }
 }
 
 void SIFTExtractor::ComputePyramid(cv::Mat image)

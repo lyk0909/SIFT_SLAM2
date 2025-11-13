@@ -36,8 +36,8 @@ namespace ORB_SLAM2
 {
 
 // Thresholds adjusted for SIFT (Euclidean distance, not Hamming)
-const int ORBmatcher::TH_HIGH = 300;  // Increased for SIFT
-const int ORBmatcher::TH_LOW = 150;   // Increased for SIFT
+const int ORBmatcher::TH_HIGH = 250;  // 进一步放宽SIFT匹配阈值
+const int ORBmatcher::TH_LOW = 120;   // 进一步放宽SIFT匹配阈值
 const int ORBmatcher::HISTO_LENGTH = 30;
 
 ORBmatcher::ORBmatcher(float nnratio, bool checkOri): mfNNratio(nnratio), mbCheckOrientation(checkOri)
